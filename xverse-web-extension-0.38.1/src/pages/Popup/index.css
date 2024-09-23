@@ -1,0 +1,30 @@
+body {
+  margin: 0;
+  padding: 0;
+  color: #ffffff;
+  position: relative;
+  background-color: #181818;
+}
+
+#app {
+  height: 600px;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  align-items: safe center;
+  @media only screen and (min-width: 360px) {
+    height: 100vh;
+    width: 100vw;
+  }
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+:focus-within,
+:focus-visible,
+:focus {
+  outline: none;
+}

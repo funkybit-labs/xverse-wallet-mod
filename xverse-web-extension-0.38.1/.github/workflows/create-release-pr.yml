@@ -1,0 +1,43 @@
+name: Create release PRs
+##
+# This workflow initiates the release process (create release PRs):
+# - creates a release branch with version bump
+# - creates a release PR to main & develop
+#
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump level'
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+jobs:
+  create-release-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+      - id: run-create-release-pr-sh
+        env:
+          BUMP: ${{ inputs.bump }}
+          SOURCE_BRANCH: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # git config
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+          # run shell script
+          cd scripts
+          ./create-release-pr.sh

@@ -1,0 +1,127 @@
+name: Publish latest release
+##
+# This workflow creates a latest release with the same target_commitish
+# as the highest rc matching the release PR version
+#
+# It should also update the release PR description
+# It should also attach the highest rc asset to the latest release
+#
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+jobs:
+  publish-latest:
+    if: ${{ github.event.pull_request.merged == true && startsWith(github.head_ref, 'release/')}}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: create-latest-release
+        name: Create latest release
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
+        run: |
+          cd scripts
+          # find the target commitish of the latest release matching our tag
+          TAG=$(echo $SOURCE_BRANCH | sed 's/release\/\(.*\)/\1/')
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/{owner}/{repo}/releases > releases.json
+          TAG_RC=$(cat releases.json | jq -r ".[] | select(.tag_name | match(\"$TAG\")) | .tag_name" | head -1)
+          TARGET_COMMITISH=$(cat releases.json | jq -r ".[] | select(.tag_name==\"$TAG_RC\") | .target_commitish")
+          # publish the latest release
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/{owner}/{repo}/releases \
+            -f tag_name="$TAG" \
+            -f target_commitish="$TARGET_COMMITISH" \
+            -f name="$TAG" \
+            -F generate_release_notes=true > release.json
+          # save env for upload
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "TARGET_COMMITISH=$TARGET_COMMITISH" >> $GITHUB_ENV
+          echo "TAG_RC=$TAG_RC" >> $GITHUB_ENV
+          echo "FILENAME=xverse-web-extension.$TAG.zip" >> $GITHUB_ENV
+          echo "UPLOAD_URL=$(cat release.json | jq -r .upload_url)" >> $GITHUB_ENV
+      - id: update-description
+        name: Update PR description with release notes
+        env:
+          PR_ID: ${{ github.event.pull_request.number }}
+        run: |
+          # update PR description
+          cat scripts/release.json | jq -r .body > body.md
+          echo -e "\n\nPublished latest release: $(cat release.json | jq -r .html_url)" >> body.md
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/{owner}/{repo}/pulls/$PR_ID \
+            -F 'body=@body.md'
+      - id: download-latest-asset
+        name: Download latest asset from rc
+        run: |
+          ASSET_ID=$(cat scripts/releases.json | jq -r ".[] | select(.tag_name==\"$TAG_RC\") | .assets[0].id")
+          gh api \
+            -H "Accept: application/octet-stream" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/{owner}/{repo}/releases/assets/$ASSET_ID > build.zip
+      - id: upload-latest-asset
+        name: Upload latest asset to latest release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ env.UPLOAD_URL}}
+          asset_path: build.zip
+          asset_name: ${{ env.FILENAME }}
+          asset_content_type: application/zip
+      - id: push-to-public
+        name: Push to public remote
+        if: ${{ contains(github.repositoryUrl, 'private') }}
+        env:
+          REMOTE_REPO: xverse-web-extension
+        run: |
+          # git config
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+          # run shell script
+          cd scripts
+          ./merge-to-remote.sh
+      - id: copy-release-to-public
+        name: Copy release to public remote
+        env:
+          REMOTE_REPO: xverse-web-extension
+        run: |
+          # publish the latest release on remote
+          cat scripts/release.json | jq -r .body > public-body.md
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/{owner}/$REMOTE_REPO/releases \
+            -f tag_name="$TAG" \
+            -f target_commitish="$TARGET_COMMITISH" \
+            -f name="$TAG" \
+            -F 'body=@public-body.md' > public-release.json
+          echo "PUBLIC_UPLOAD_URL=$(cat public-release.json | jq -r .upload_url)" >> $GITHUB_ENV
+      - id: upload-latest-asset-to-public
+        name: Upload latest asset to latest release on public remote
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ env.PUBLIC_UPLOAD_URL}}
+          asset_path: build.zip
+          asset_name: ${{ env.FILENAME }}
+          asset_content_type: application/zip

@@ -1,0 +1,216 @@
+name: Build & Publish release candidate
+##
+# This workflow builds new release candidates (create release + upload asset):
+# - for a new release PR and
+# - for every push to the release PR head branch
+#
+# It should also keep the release PR description in sync with the latest release candidate
+#
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+jobs:
+  build:
+    if: ${{ startsWith(github.head_ref, 'release/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          always-auth: true
+          node-version: 18
+          registry-url: https://npm.pkg.github.com
+          scope: '@secretkeylabs'
+          cache: npm
+      - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGE_REGISTRY_TOKEN }}
+        run: npm ci
+      - name: Test
+        run: |
+          npx eslint .
+          npx tsc --noEmit
+          npm test
+      - name: Build
+        env:
+          TRANSAC_API_KEY: ${{ secrets.TRANSAC_API_KEY }}
+          MOON_PAY_API_KEY: ${{ secrets.MOON_PAY_API_KEY }}
+          MIX_PANEL_TOKEN: ${{ secrets.MIX_PANEL_TOKEN }}
+          MIX_PANEL_EXPLORE_APP_TOKEN: ${{ secrets.MIX_PANEL_EXPLORE_APP_TOKEN }}
+        run: npm run build
+      - name: Upload Archive
+        uses: actions/upload-artifact@v3
+        with:
+          name: web-extension1
+          path: ./build
+          retention-days: 5
+          if-no-files-found: error
+  UItest:
+    needs: [build]
+    name: E2E Test ${{ matrix.shardIndex }} of ${{ matrix.shardTotal }}
+    timeout-minutes: 10
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2, 3, 4, 5, 6]
+        shardTotal: [6]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: web-extension1
+          path: ./build
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          always-auth: true
+          node-version: 18
+          registry-url: https://npm.pkg.github.com
+          scope: '@secretkeylabs'
+          cache: npm
+      - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGE_REGISTRY_TOKEN }}
+        run: npm install playwright
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+      - name: Run E2E test suite
+        env:
+          SEED_WORDS1: ${{ secrets.SEED_WORDS1 }}
+          SEED_WORDS2: ${{ secrets.SEED_WORDS2 }}
+        run: xvfb-run --auto-servernum --server-args="-screen 0 360x360x24" npx playwright test --grep-invert "#localexecution" --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: all-blob-reports
+          path: blob-report
+          retention-days: 1
+
+  merge-reports:
+    # Merge reports after playwright-tests, even if some shards have failed but not if the job was skipped
+    if: ${{ always() && needs.UItest.result != 'skipped' }}
+    needs: [UItest]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          always-auth: true
+          node-version: 18
+          registry-url: https://npm.pkg.github.com
+          scope: '@secretkeylabs'
+          cache: npm
+      - name: Install dependencies
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PACKAGE_REGISTRY_TOKEN }}
+        run: npm install playwright
+
+      - name: Download blob reports from GitHub Actions Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: all-blob-reports
+          path: all-blob-reports
+
+      - name: Merge into HTML Report
+        run: npx playwright merge-reports --reporter html ./all-blob-reports
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v3
+        with:
+          name: html-report--attempt-${{ github.run_attempt }}
+          path: playwright-report
+          retention-days: 4
+
+  publish-rc:
+    # TODO also keep the develop PR description up to date
+    if: ${{ github.base_ref == 'main' }}
+    needs: [UItest]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      upload_url: ${{ steps.publish-prerelease.outputs.UPLOAD_URL }}
+      filename: ${{ steps.publish-prerelease.outputs.FILENAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: publish-prerelease
+        name: Publish release candidate as prerelease
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
+          TARGET_COMMITISH: ${{ github.event.pull_request.head.sha }}
+        run: |
+          cd scripts
+          # find the next rc tag
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/{owner}/{repo}/releases > releases.json
+          # get $TAG from branch name, e.g. v0.25.0
+          export TAG=$(echo $SOURCE_BRANCH | sed 's/release\/\(.*\)/\1/')
+          # export $NEXT_TAG using releases.json and $TAG, e.g. v0.25.0-rc.0
+          source ./find-tag.sh
+          # publish the release as prerelease rc
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/{owner}/{repo}/releases \
+            -f tag_name="$NEXT_TAG" \
+            -f target_commitish="$TARGET_COMMITISH" \
+            -f name="$NEXT_TAG" \
+            -F draft=false \
+            -F prerelease=true \
+            -F generate_release_notes=true > release.json
+          # save output for upload
+          echo "FILENAME=xverse-web-extension.$NEXT_TAG.zip" >> $GITHUB_OUTPUT
+          echo "UPLOAD_URL=$(cat release.json | jq -r .upload_url)" >> $GITHUB_OUTPUT
+      - id: update-description
+        name: Update PR description with release notes
+        env:
+          PR_ID: ${{ github.event.pull_request.number }}
+        run: |
+          # update PR description
+          cd scripts
+          cat release.json | jq -r .body > body.md
+          echo -e "\n\nRelease candidate: $(cat release.json | jq -r .html_url)" >> body.md
+          echo -e "\nTo publish this rc as latest: Merge Commit this PR" >> body.md
+          gh api \
+            --method PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/{owner}/{repo}/pulls/$PR_ID \
+            -F 'body=@body.md'
+  build-rc:
+    needs: publish-rc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: web-extension1
+          path: ./build
+      - uses: actions/setup-node@v4
+      - name: zip
+        run: zip -rj build.zip ./build
+      - name: Upload release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPLOAD_URL: ${{needs.publish-rc.outputs.upload_url}}
+          FILENAME: ${{needs.publish-rc.outputs.filename}}
+        with:
+          upload_url: ${{ env.UPLOAD_URL}}
+          asset_path: build.zip
+          asset_name: ${{ env.FILENAME }}
+          asset_content_type: application/zip

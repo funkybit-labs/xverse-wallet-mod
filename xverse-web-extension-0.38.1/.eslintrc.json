@@ -1,0 +1,75 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true
+  },
+  "extends": [
+    "plugin:react/recommended",
+    "airbnb",
+    "airbnb-typescript",
+    "airbnb/hooks",
+    "prettier",
+    "plugin:@tanstack/eslint-plugin-query/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "ecmaVersion": "latest",
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "plugins": ["react", "prettier", "eslint-plugin-no-inline-styles", "@tanstack/query"],
+  "rules": {
+    "consistent-return": "off",
+    "no-await-in-loop": "off",
+    "import/prefer-default-export": 1,
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": ["@secretkeylabs/xverse-core/**/*"]
+      }
+    ],
+    "no-promise-executor-return": "warn",
+    "max-len": "off",
+    "no-inline-styles/no-inline-styles": 2,
+    "no-nested-ternary": "off",
+    "no-param-reassign": "off",
+    "react-hooks/exhaustive-deps": "warn",
+    "react/jsx-key": "warn",
+    "react/jsx-props-no-spreading": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/require-default-props": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      {
+        "vars": "all",
+        "args": "after-used",
+        "ignoreRestSiblings": true,
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "no-plusplus": "off",
+    "@tanstack/query/exhaustive-deps": 1,
+    "import/order": 0
+  },
+  "overrides": [
+    {
+      "files": ["tests/**/*.{js,jsx,ts,tsx}"],
+      "plugins": ["playwright"],
+      "extends": ["plugin:playwright/playwright-test"],
+      "rules": {
+        "playwright/expect-expect": "off"
+      }
+    }
+  ],
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "extensions": [".js", ".jsx", ".ts", ".tsx"],
+        "moduleDirectory": ["node_modules", "src/"]
+      }
+    }
+  }
+}

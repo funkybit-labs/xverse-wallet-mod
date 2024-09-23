@@ -1,0 +1,34 @@
+{
+  "name": "Xverse Wallet",
+  "description": "A Bitcoin Wallet for Web3",
+  "manifest_version": 3,
+  "options_page": "options.html",
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "xverse_icon.png",
+    "default_title": "Xverse Wallet"
+  },
+  "chrome_url_overrides": {},
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "128": "xverse_icon.png"
+  },
+  "devtools_page": "devtools.html",
+  "web_accessible_resources": [{ "resources": ["inpage.js"], "matches": ["*://*/*"] }],
+  "host_permissions": ["*://*/*"],
+  "permissions": ["storage"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; default-src 'none'; connect-src *; style-src 'unsafe-inline'; frame-src 'none'; frame-ancestors 'none'; img-src 'self' data: https:;  media-src 'self' data: https:; font-src 'self' data:;"
+  },
+  "content_scripts": [
+    {
+      "run_at": "document_start",
+      "js": ["browser-polyfill.js", "content-script.js"],
+      "matches": ["*://*/*"],
+      "all_frames": true
+    }
+  ]
+}
