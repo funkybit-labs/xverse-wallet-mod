@@ -15,8 +15,7 @@
     "test": "vitest run --coverage",
     "test-dev": "vitest",
     "lint": "eslint .",
-    "lint:prettier": "echo 'TODO: move to lint script' && prettier -c '**/*.{ts,tsx,js,jsx}'",
-    "prepare": "husky install"
+    "lint:prettier": "echo 'TODO: move to lint script' && prettier -c '**/*.{ts,tsx,js,jsx}'"
   },
   "dependencies": {
     "@bitcoinerlab/secp256k1": "^1.0.2",

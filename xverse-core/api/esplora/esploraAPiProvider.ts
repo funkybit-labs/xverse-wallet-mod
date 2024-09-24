@@ -154,7 +154,14 @@ export class BitcoinEsploraApiProvider {
   }
 
   async sendRawTransaction(rawTransaction: string): Promise<BtcTransactionBroadcastResponse> {
-    const data = await this.httpPost<string>('/tx', rawTransaction);
+    let data
+
+    if (this._network === 'Signet') {
+      data = await this.bitcoinApi.post<string>('/tx', rawTransaction, {headers: {'content-type': 'text/plain'}}).then(r => r.data);
+    } else {
+      data = await this.httpPost<string>('/tx', rawTransaction);
+    }
+
     return {
       tx: {
         hash: data,

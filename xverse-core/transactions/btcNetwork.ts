@@ -21,10 +21,17 @@ const bitcoinTestnet: BitcoinNetwork = {
   wif: 0xef,
 };
 
+const bitcoinRegtest: BitcoinNetwork = {
+  bech32: 'bcrt',
+  pubKeyHash: 0x6f,
+  scriptHash: 0xc4,
+  wif: 0xef,
+};
+
 export const bitcoinNetworks: Record<NetworkType, BitcoinNetwork> = {
   Mainnet: bitcoinMainnet,
   Testnet: bitcoinTestnet,
-  Signet: bitcoinTestnet,
+  Signet: bitcoinRegtest,
 };
 
 export const getBtcNetwork = (networkType: NetworkType) => {

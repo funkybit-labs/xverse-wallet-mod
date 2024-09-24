@@ -9,7 +9,7 @@ const networkRouteMap = {
 
 const getRecommendedFees = async (network: NetworkType): Promise<RecommendedFeeResponse> => {
   const { data } = await axios.get<RecommendedFeeResponse>(
-    `https://mempool.space/${networkRouteMap[network]}api/v1/fees/recommended`,
+    network === 'Signet' ? 'https://mempool.dev.aws.archnetwork.xyz/api/v1/fees/recommended' : `https://mempool.space/${networkRouteMap[network]}api/v1/fees/recommended`,
   );
   return data;
 };

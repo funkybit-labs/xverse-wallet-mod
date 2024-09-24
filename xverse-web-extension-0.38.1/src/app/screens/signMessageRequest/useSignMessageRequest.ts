@@ -57,6 +57,7 @@ export const useSignMessageValidation = (requestPayload: SignMessagePayload | un
   const { switchAccount } = useWalletReducer();
 
   const checkAddressAvailability = () => {
+    console.log('checkAddressAvailability', requestPayload?.address, accountsList, selectedAccount)
     const account = accountsList.filter((acc) => {
       if (acc.btcAddress === requestPayload?.address) {
         return true;
@@ -81,6 +82,7 @@ export const useSignMessageValidation = (requestPayload: SignMessagePayload | un
     if (account) {
       switchAccount(account);
     } else {
+      console.log('validateSignMessage')
       setValidationError({
         error: t('ADDRESS_MISMATCH'),
       });

@@ -55,6 +55,7 @@ const handleGetBalance = async (message: RpcRequestMessage, port: chrome.runtime
 
   const { origin, tabId } = makeContext(port);
   const [error, store] = await utils.loadPermissionsStore();
+  console.log(error, store)
 
   if (error) {
     sendInternalErrorMessage({ tabId, messageId: parseResult.output.id });
@@ -83,25 +84,6 @@ const handleGetBalance = async (message: RpcRequestMessage, port: chrome.runtime
 
   if (!existingAccount) {
     sendInternalErrorMessage({ tabId, messageId: parseResult.output.id });
-    return;
-  }
-
-  const permission = utils.getClientPermission(
-    store.permissions,
-    origin,
-    makeAccountResourceId({
-      accountId: selectedAccountIndex,
-      networkType: network.type,
-      masterPubKey: existingAccount.masterPubKey,
-    }),
-  );
-  if (!permission) {
-    sendAccessDeniedResponseMessage({ tabId, messageId: parseResult.output.id });
-    return;
-  }
-
-  if (!permission.actions.has('read')) {
-    sendAccessDeniedResponseMessage({ tabId, messageId: parseResult.output.id });
     return;
   }
 
