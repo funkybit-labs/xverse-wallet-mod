@@ -14,5 +14,5 @@ make build
 
 ## Usage
 
-In wallet extension settings switch the network to Signet and make sure that BTC URl is set to https://mempool.dev.aws.archnetwork.xyz/api
+In wallet extension settings switch the network to Signet and make sure that BTC URl is set to http://localhost:1080/api
 

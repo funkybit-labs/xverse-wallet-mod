@@ -33,10 +33,10 @@ export const WALLET_CONFIG_PATH = `m/44/5757'/0'/1`;
 // BTC
 export const BTC_BASE_URI_MAINNET = 'https://mempool.space/api';
 export const BTC_BASE_URI_TESTNET = 'https://mempool.space/testnet/api';
-export const BTC_BASE_URI_SIGNET = 'https://mempool.dev.aws.archnetwork.xyz/api';
+export const BTC_BASE_URI_SIGNET = 'http://localhost:1080/api';
 export const XVERSE_BTC_BASE_URI_MAINNET = 'https://btc-1.xverse.app';
 export const XVERSE_BTC_BASE_URI_TESTNET = 'https://btc-testnet.xverse.app';
-export const XVERSE_BTC_BASE_URI_SIGNET = 'https://mempool.dev.aws.archnetwork.xyz/api';
+export const XVERSE_BTC_BASE_URI_SIGNET = 'http://localhost:1080/api';
 
 // STX
 export const HIRO_MAINNET_DEFAULT = 'https://api.hiro.so';
